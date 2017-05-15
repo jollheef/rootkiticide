@@ -7,15 +7,27 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/kallsyms.h>
+#include <linux/perf_event.h>
+#include <linux/hw_breakpoint.h>
+
+#include "rootkiticide.h"
 
 static int rootkiticide_init(void)
 {
+	ulong ret = scheduler_hook_init();
+	if (IS_ERR_VALUE(ret))
+		return ret;
+
+	printk("rkcd: init success\n");
 	return 0;		/* success */
 }
 module_init(rootkiticide_init);
 
 static void rootkiticide_exit(void)
 {
+	scheduler_hook_cleanup();
+	printk("rkcd: cleanup\n");
 }
 module_exit(rootkiticide_exit);
 

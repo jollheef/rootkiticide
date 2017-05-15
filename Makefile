@@ -2,7 +2,7 @@ KERNEL := /lib/modules/$(shell uname -r)/build
 VMHOST := qemu
 
 obj-m += rkcd.o
-rkcd-objs = rootkiticide.o
+rkcd-objs = rootkiticide.o scheduler_hook.o
 ccflags-y := -std=gnu99 -Wno-declaration-after-statement
 
 all:
