@@ -19,6 +19,12 @@ static int rootkiticide_init(void)
 	if (IS_ERR_VALUE(ret))
 		return ret;
 
+	ret = fd_hook_init();
+	if (IS_ERR_VALUE(ret)) {
+		scheduler_hook_cleanup();
+		return ret;
+	}
+
 	printk("rkcd: init success\n");
 	return 0;		/* success */
 }

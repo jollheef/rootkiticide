@@ -6,3 +6,4 @@ Module.symvers
 *.o
 modules.order
 *.gcno
+.#*
