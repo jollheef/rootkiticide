@@ -19,6 +19,43 @@
 static struct perf_event * __percpu *vfs_write_hbp;
 static struct perf_event * __percpu *vfs_writev_hbp;
 
+__attribute__((warn_unused_result))
+static int dump_socket(struct socket *sock)
+{
+	ulong ret;
+	struct sockaddr_storage saddr;
+	int buflen;
+	ret = sock->ops->getname(sock, (struct sockaddr *)&saddr, &buflen, 1);
+	if (IS_ERR_VALUE(ret))
+		return ret;
+
+	sa_family_t family = ((struct sockaddr *)&saddr)->sa_family;
+	if (family != AF_INET && family != AF_INET6)
+		return -EINVAL;
+
+	printk("rkcd:netop pid=%d tgid=%d comm=%s sock=%pISpc\n",
+	       current->pid, current->tgid, current->comm,
+	       &saddr);
+
+	return 0;
+}
+
+__attribute__((warn_unused_result))
+static int dump_file(struct file *file)
+{
+	char buf[PATH_MAX] = { 0 };
+	char *filename = dentry_path_raw(file->f_path.dentry,
+					 buf, sizeof(buf));
+	if (IS_ERR_OR_NULL(filename))
+		return PTR_ERR(filename);
+
+	printk("rkcd:vfsop pid=%d tgid=%d comm=%s file=%s\n",
+	       current->pid, current->tgid, current->comm,
+	       filename);
+
+	return 0;
+}
+
 static int dump_all_fds(const void *v, struct file *file, uint fd)
 {
 	int err;
@@ -27,36 +64,12 @@ static int dump_all_fds(const void *v, struct file *file, uint fd)
 		return -EINVAL;
 
 	struct socket *sock = sock_from_file(file, &err);
-	if (sock) {
-		struct sockaddr_storage saddr;
-		int buflen;
-		ulong ret = sock->ops->getname(
-			sock, (struct sockaddr *)&saddr, &buflen, 1);
-		if (IS_ERR_VALUE(ret))
-			return ret;
+	if (sock)
+		return dump_socket(sock);
+	else if (err == -ENOTSOCK)
+		return dump_file(file);
 
-		sa_family_t family = ((struct sockaddr *)&saddr)->sa_family;
-		if (family != AF_INET && family != AF_INET6)
-			return -EINVAL;
-
-		printk("rkcd:netop pid=%d tgid=%d comm=%s sock=%pISpc\n",
-		       current->pid, current->tgid, current->comm,
-		       &saddr);
-
-	} else if (err == -ENOTSOCK) {
-		char buf[PATH_MAX] = { 0 };
-		char *filename = dentry_path_raw(file->f_path.dentry,
-						 buf, sizeof(buf));
-		if (IS_ERR_OR_NULL(filename))
-			return PTR_ERR(filename);
-
-		printk("rkcd:vfsop pid=%d tgid=%d comm=%s file=%s\n",
-		       current->pid, current->tgid, current->comm,
-		       filename);
-	} else {
-		BUG();
-	}
-
+	BUG();
 	return 0;
 }
 
