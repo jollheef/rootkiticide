@@ -13,6 +13,7 @@
 
 #include "rootkiticide.h"
 
+spinlock_t log_queue_lock;
 LIST_HEAD(log_queue);
 
 enum log_type {
@@ -70,7 +71,9 @@ static int proc_seq_show(struct seq_file *s, void *v)
 	}
 	seq_printf(s, " }\n");
 
+	spin_lock(&log_queue_lock);
 	list_del(&e->list);
+	spin_unlock(&log_queue_lock);
 	kfree(e);
 	return 0;
 }
@@ -114,7 +117,9 @@ static int __must_check log_common(struct log_entry *entry)
 	entry->common.tgid = current->tgid;
 	memcpy(&entry->common.comm, current->comm, sizeof(entry->common.comm));
 
+	spin_lock(&log_queue_lock);
 	list_add_tail(&entry->list, &log_queue);
+	spin_unlock(&log_queue_lock);
 	return 0;
 }
 
