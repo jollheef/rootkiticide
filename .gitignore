@@ -7,3 +7,6 @@ Module.symvers
 modules.order
 *.gcno
 .#*
+GPATH
+GRTAGS
+GTAGS
