@@ -57,7 +57,7 @@ static int proc_seq_show(struct seq_file *s, void *v)
 
 	seq_printf(s, "{ ");
 	/* TODO escape comm */
-	seq_printf(s, "'id': %lu, 'pid': %d, 'tgid': %d, 'comm': '%s'",
+	seq_printf(s, "\"id\": %lu, \"pid\": %d, \"tgid\": %d, \"comm\": \"%s\"",
 		   e->id, e->common.pid, e->common.tgid, e->common.comm);
 	switch (e->log_type) {
 	case LOG_PROCESS:
@@ -65,10 +65,10 @@ static int proc_seq_show(struct seq_file *s, void *v)
 		break;
 	case LOG_FILE:
 		/* TODO escape filename */
-		seq_printf(s, ", 'filename': '%s'", e->file.filename);
+		seq_printf(s, ", \"filename\": \"%s\"", e->file.filename);
 		break;
 	case LOG_SOCKET:
-		seq_printf(s, ", 'saddr': '%pISpc'", &e->socket.saddr);
+		seq_printf(s, ", \"saddr\": \"%pISpc\"", &e->socket.saddr);
 		break;
 	}
 	seq_printf(s, " }\n");
