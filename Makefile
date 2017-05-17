@@ -9,10 +9,12 @@ ccflags-y += -Wframe-larger-than=8192 # it's safe or not?
 
 all:
 	make -C $(KERNEL) M=$(PWD) modules
+	go build rkcdcli.go
 
 clean:
 	make -C $(KERNEL) M=$(PWD) clean
+	rm rkcdcli
 
 vm-insmod: all
-	scp *.ko "$(VMHOST):"
+	scp {*.ko,rkcdcli} "$(VMHOST):"
 	ssh $(VMHOST) "rmmod *.ko; insmod *.ko"
