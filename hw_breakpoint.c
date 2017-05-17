@@ -13,8 +13,7 @@
 #include <linux/perf_event.h>
 #include <linux/hw_breakpoint.h>
 
-__attribute__((warn_unused_result))
-int is_kernel_address_valid(ulong addr)
+int __must_check is_kernel_address_valid(ulong addr)
 {
 	ulong above = ((long)addr) >> __VIRTUAL_MASK_SHIFT;
         if (above != 0 && above != -1UL)
@@ -45,9 +44,9 @@ int is_kernel_address_valid(ulong addr)
         return pfn_valid(pte_pfn(*pte));
 }
 
-__attribute__((warn_unused_result)) struct perf_event * __percpu *
-hbp_on_exec(const char *const funcname,
-	    const perf_overflow_handler_t handler)
+struct perf_event * __percpu *  __must_check hbp_on_exec(
+	const char *const funcname,
+	const perf_overflow_handler_t handler)
 {
 	struct perf_event_attr attr;
 	hw_breakpoint_init(&attr);

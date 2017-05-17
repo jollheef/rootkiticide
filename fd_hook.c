@@ -19,8 +19,7 @@
 static struct perf_event * __percpu *vfs_write_hbp;
 static struct perf_event * __percpu *vfs_writev_hbp;
 
-__attribute__((warn_unused_result))
-static int dump_socket(struct socket *sock)
+static int __must_check dump_socket(struct socket *sock)
 {
 	ulong ret;
 	struct sockaddr_storage saddr;
@@ -33,15 +32,10 @@ static int dump_socket(struct socket *sock)
 	if (family != AF_INET && family != AF_INET6)
 		return -EINVAL;
 
-	printk("rkcd:netop pid=%d tgid=%d comm=%s sock=%pISpc\n",
-	       current->pid, current->tgid, current->comm,
-	       &saddr);
-
-	return 0;
+	return log_socket(&saddr);
 }
 
-__attribute__((warn_unused_result))
-static int dump_file(struct file *file)
+static int __must_check dump_file(struct file *file)
 {
 	char buf[PATH_MAX] = { 0 };
 	char *filename = dentry_path_raw(file->f_path.dentry,
@@ -49,14 +43,10 @@ static int dump_file(struct file *file)
 	if (IS_ERR_OR_NULL(filename))
 		return PTR_ERR(filename);
 
-	printk("rkcd:vfsop pid=%d tgid=%d comm=%s file=%s\n",
-	       current->pid, current->tgid, current->comm,
-	       filename);
-
-	return 0;
+	return log_file(filename);
 }
 
-static int dump_all_fds(const void *v, struct file *file, uint fd)
+static int __must_check dump_all_fds(const void *v, struct file *file, uint fd)
 {
 	int err;
 
@@ -82,7 +72,7 @@ static void x_fd_handler(struct perf_event *bp,
 		return;
 }
 
-int fd_hook_init(void)
+int __must_check fd_hook_init(void)
 {
 	/* Set hardware breakpoint on vfs functions */
 	vfs_write_hbp = hbp_on_exec("__vfs_write", x_fd_handler);

@@ -18,8 +18,8 @@ static void try_to_wake_up_handler(struct perf_event *bp,
 				   struct perf_sample_data *data,
 				   struct pt_regs *regs)
 {
-	printk("rkcd:sched pid=%d, tgid=%d, comm=%s\n",
-	current->pid, current->tgid, current->comm);
+	ulong err = log_process();
+	WARN_ON(err);
 }
 
 int scheduler_hook_init(void)
