@@ -39,8 +39,7 @@ static int __must_check dump_socket(struct socket *sock)
 static int __must_check dump_file(struct file *file)
 {
 	char buf[PATH_MAX] = { 0 };
-	char *filename = dentry_path_raw(file->f_path.dentry,
-					 buf, sizeof(buf));
+	char *filename = d_path(&file->f_path, buf, sizeof(buf));
 	if (IS_ERR_OR_NULL(filename))
 		return PTR_ERR(filename);
 
