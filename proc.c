@@ -15,6 +15,7 @@
 
 spinlock_t log_queue_lock;
 LIST_HEAD(log_queue);
+atomic_t counter = ATOMIC_INIT(0);
 
 enum log_type {
 	LOG_SOCKET,
@@ -24,6 +25,7 @@ enum log_type {
 
 struct log_entry {
 	struct list_head list;
+	ulong id;
 	enum log_type log_type;
 	struct {
 		/* must be filled for all */
@@ -55,8 +57,8 @@ static int proc_seq_show(struct seq_file *s, void *v)
 
 	seq_printf(s, "{ ");
 	/* TODO escape comm */
-	seq_printf(s, "'pid': %d, 'tgid': %d, 'comm': '%s'",
-		   e->common.pid, e->common.tgid, e->common.comm);
+	seq_printf(s, "'id': %lu, 'pid': %d, 'tgid': %d, 'comm': '%s'",
+		   e->id, e->common.pid, e->common.tgid, e->common.comm);
 	switch (e->log_type) {
 	case LOG_PROCESS:
 		/* current no additional record info */
@@ -118,6 +120,8 @@ static int __must_check log_common(struct log_entry *entry)
 	memcpy(&entry->common.comm, current->comm, sizeof(entry->common.comm));
 
 	spin_lock(&log_queue_lock);
+	entry->id = atomic_read(&counter);
+	atomic_inc(&counter);
 	list_add_tail(&entry->list, &log_queue);
 	spin_unlock(&log_queue_lock);
 	return 0;
