@@ -15,20 +15,20 @@
 
 static int rootkiticide_init(void)
 {
-	ulong ret = scheduler_hook_init();
+	ulong ret = proc_init();
 	if (IS_ERR_VALUE(ret))
 		return ret;
 
 	ret = fd_hook_init();
 	if (IS_ERR_VALUE(ret)) {
-		scheduler_hook_cleanup();
+		proc_cleanup();
 		return ret;
 	}
 
-	ret = proc_init();
+	ret = scheduler_hook_init();
 	if (IS_ERR_VALUE(ret)) {
-		scheduler_hook_cleanup();
 		fd_hook_cleanup();
+		proc_cleanup();
 		return ret;
 	}
 
