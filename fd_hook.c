@@ -11,8 +11,9 @@
 #include <linux/perf_event.h>
 #include <linux/namei.h>
 #include <linux/fdtable.h>
-#include <asm/pgtable.h>
 #include <linux/net.h>
+#include <linux/delay.h>
+#include <asm/pgtable.h>
 
 #include "rootkiticide.h"
 
@@ -63,13 +64,14 @@ static int __must_check dump_all_fds(const void *v, struct file *file, uint fd)
 	return 0;
 }
 
+static atomic_t x_fd_handler_usage = ATOMIC_INIT(0);
 static void x_fd_handler(struct perf_event *bp,
 			 struct perf_sample_data *data,
 			 struct pt_regs *regs)
 {
-	ulong ret = iterate_fd(current->files, 0, dump_all_fds, NULL);
-	if (IS_ERR_VALUE(ret))
-		return;
+	atomic_inc(&x_fd_handler_usage);
+	iterate_fd(current->files, 0, dump_all_fds, NULL);
+	atomic_dec(&x_fd_handler_usage);
 }
 
 int __must_check fd_hook_init(void)
@@ -88,6 +90,9 @@ int __must_check fd_hook_init(void)
 
 void fd_hook_cleanup(void)
 {
+	while (atomic_read(&x_fd_handler_usage))
+		msleep_interruptible(100);
+
 	hbp_clear(vfs_write_hbp);
 	hbp_clear(vfs_writev_hbp);
 }
