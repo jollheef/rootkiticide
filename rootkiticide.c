@@ -40,6 +40,8 @@ module_init(rootkiticide_init);
 static void rootkiticide_exit(void)
 {
 	scheduler_hook_cleanup();
+	fd_hook_cleanup();
+	proc_cleanup();
 	printk("rkcd: cleanup\n");
 }
 module_exit(rootkiticide_exit);
