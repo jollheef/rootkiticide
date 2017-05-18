@@ -14,6 +14,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 )
 
 func readBytesUntilEOF(pipe io.ReadCloser) (buf []byte, err error) {
@@ -90,6 +92,36 @@ type logEntry struct {
 	Saddr    string
 }
 
+func hiddenFile(filename string) (hidden bool) {
+	stdout, _, _, err := system("/bin/ls", filepath.Dir(filename))
+	if err != nil {
+		panic(err)
+	}
+
+	hidden = !strings.Contains(stdout, filepath.Base(filename))
+	return
+}
+
+func hiddenAddr(addr string) (hidden bool) {
+	stdout, _, _, err := system("/bin/netstat", "-n")
+	if err != nil {
+		panic(err)
+	}
+
+	hidden = !strings.Contains(stdout, addr)
+	return
+}
+
+func hiddenPID(pid int) (hidden bool) {
+	stdout, _, _, err := system("/bin/ps", "-eo", "pid")
+	if err != nil {
+		panic(err)
+	}
+
+	hidden = !strings.Contains(stdout, fmt.Sprintf("%d", pid))
+	return
+}
+
 func main() {
 	file, err := os.Open("/proc/rootkiticide")
 	if err != nil {
@@ -127,22 +159,25 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println("Files:")
-	for key, _ := range files {
-		// TODO call system and check file visible
-		fmt.Println("\t", key)
+	fmt.Println("Hidden files (or already removed):")
+	for file, _ := range files {
+		if hiddenFile(file) {
+			fmt.Println("\t", file)
+		}
 	}
 
-	fmt.Println("Connections:")
-	for key, _ := range addrs {
-		// TODO call netstat and check file visible
-		fmt.Println("\t", key)
+	fmt.Println("Hidden connections (or already closed):")
+	for addr, _ := range addrs {
+		if hiddenAddr(addr) {
+			fmt.Println("\t", addr)
+		}
 	}
 
-	fmt.Println("Processes:")
-	for key, value := range pids {
-		// TODO call ps and check file visible
-		fmt.Println("\t", key, value)
+	fmt.Println("Hidden processes (or already killed):")
+	for pid, comm := range pids {
+		if hiddenPID(pid) {
+			fmt.Println("\t", pid, comm)
+		}
 	}
 
 	return
