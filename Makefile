@@ -13,7 +13,7 @@ all:
 
 clean:
 	make -C $(KERNEL) M=$(PWD) clean
-	rm rkcdcli
+	rm -f rkcdcli
 
 vm-insmod: all
 	scp {*.ko,rkcdcli} "$(VMHOST):"
