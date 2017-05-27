@@ -17,6 +17,8 @@ spinlock_t log_queue_lock;
 LIST_HEAD(log_queue);
 atomic_t counter = ATOMIC_INIT(0);
 
+static pid_t proc_reader = 0;
+
 enum log_type {
 	LOG_SOCKET,
 	LOG_FILE,
@@ -101,6 +103,7 @@ static const struct seq_operations proc_seq_ops = {
 
 static int proc_open(struct inode *inode, struct  file *file)
 {
+	proc_reader = current->real_parent->pid;
 	return seq_open(file, &proc_seq_ops);
 }
 
@@ -112,8 +115,28 @@ static const struct file_operations proc_fops = {
 	.release = seq_release,
 };
 
+static int __must_check is_reader_or_child(void)
+{
+	struct task_struct *t, *prev;
+	t = current;
+	do {
+		if (t->pid == proc_reader)
+			return true;
+
+		prev = t;
+		t = t->real_parent;
+	} while (prev->pid != 0);
+
+	return false;
+}
+
 static int __must_check log_common(struct log_entry *entry)
 {
+	if (proc_reader && is_reader_or_child()) {
+		kfree(entry);
+		return 0;
+	}
+
 	/* fill common log record info */
 	entry->common.pid = current->pid;
 	entry->common.tgid = current->tgid;
