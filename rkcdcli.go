@@ -93,7 +93,7 @@ type logEntry struct {
 }
 
 func hiddenFile(filename string) (hidden bool) {
-	stdout, _, _, err := system("/bin/ls", filepath.Dir(filename))
+	stdout, _, _, err := system("/bin/ls", "-a", filepath.Dir(filename))
 	if err != nil {
 		panic(err)
 	}
