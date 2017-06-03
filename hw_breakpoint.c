@@ -10,8 +10,18 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/version.h>
 #include <linux/perf_event.h>
 #include <linux/hw_breakpoint.h>
+#include <asm/pgtable.h>
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0)
+/* introduced in 0ee364eb316348ddf3e0dfcd986f5f13f528f821 */
+static inline unsigned long pud_pfn(pud_t pud)
+{
+	return (pud_val(pud) & PTE_PFN_MASK) >> PAGE_SHIFT;
+}
+#endif
 
 int __must_check is_kernel_address_valid(ulong addr)
 {
