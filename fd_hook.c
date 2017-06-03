@@ -47,6 +47,19 @@ static int __must_check dump_file(struct file *file)
 	return log_file(filename);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,5,0)
+/* EXPORT_SYMBOL after 406a3c638ce8b17d9704052c07955490f732c2b8 */
+static struct file_operations *socket_op;
+static struct socket *sock_from_file(struct file *file, int *err)
+{
+	if (file->f_op == socket_op)
+		return file->private_data;	/* set in sock_map_fd */
+
+	*err = -ENOTSOCK;
+	return NULL;
+}
+#endif
+
 static int __must_check dump_all_fds(const void *v, struct file *file, uint fd)
 {
 	int err;
@@ -101,6 +114,12 @@ static void x_fd_handler(struct perf_event *bp,
 
 int __must_check fd_hook_init(void)
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,5,0)
+/* EXPORT_SYMBOL after 406a3c638ce8b17d9704052c07955490f732c2b8 */
+	socket_op = (typeof(socket_op))kallsyms_lookup_name("socket_file_ops");
+	if (!socket_op || !is_kernel_address_valid((ulong)socket_op))
+		return -EINVAL;
+#endif
 	/* Set hardware breakpoint on vfs functions */
 	vfs_write_hbp = hbp_on_exec("__vfs_write", x_fd_handler);
 	if (IS_ERR(vfs_write_hbp))
