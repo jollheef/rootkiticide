@@ -6,9 +6,11 @@
  */
 
 #include <linux/module.h>
+#include <linux/version.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/slab.h>
+#include <linux/list.h>
 #include <linux/net.h>
 
 #include "rootkiticide.h"
@@ -44,6 +46,12 @@ struct log_entry {
 		char filename[PATH_MAX + 1];
 	} file;
 };
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
+/* introduced in 6d7581e62f8be462440d7b22c6361f7c9fa4902b */
+#define list_first_entry_or_null(ptr, type, member) \
+	(!list_empty(ptr) ? list_first_entry(ptr, type, member) : NULL)
+#endif
 
 static void *proc_seq_start(struct seq_file *s, loff_t *pos)
 {
