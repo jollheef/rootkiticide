@@ -7,6 +7,7 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/version.h>
 #include <linux/fs.h>
 #include <linux/perf_event.h>
 #include <linux/namei.h>
@@ -62,6 +63,31 @@ static int __must_check dump_all_fds(const void *v, struct file *file, uint fd)
 	BUG();
 	return 0;
 }
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,6,0)
+/* helper introduced in c3c073f808b22dfae15ef8412b6f7b998644139a */
+int iterate_fd(struct files_struct *files, unsigned n,
+		int (*f)(const void *, struct file *, unsigned),
+		const void *p)
+{
+	struct fdtable *fdt;
+	int res = 0;
+	if (!files)
+		return 0;
+	spin_lock(&files->file_lock);
+	for (fdt = files_fdtable(files); n < fdt->max_fds; n++) {
+		struct file *file;
+		file = rcu_dereference_check_fdtable(files, fdt->fd[n]);
+		if (!file)
+			continue;
+		res = f(p, file, n);
+		if (res)
+			break;
+	}
+	spin_unlock(&files->file_lock);
+	return res;
+}
+#endif
 
 static atomic_t x_fd_handler_usage = ATOMIC_INIT(0);
 static void x_fd_handler(struct perf_event *bp,
