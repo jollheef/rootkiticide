@@ -14,10 +14,16 @@
 #include <linux/net.h>
 
 #include "rootkiticide.h"
+#include "ringbuf.h"
 
 spinlock_t log_queue_lock;
 LIST_HEAD(log_queue);
 atomic_t counter = ATOMIC_INIT(0);
+
+struct ringbuf rbuf = {
+	.head = ATOMIC_INIT(0),
+	.tail = ATOMIC_INIT(0)
+};
 
 static pid_t proc_reader = 0;
 
@@ -55,10 +61,7 @@ struct log_entry {
 
 static void *proc_seq_start(struct seq_file *s, loff_t *pos)
 {
-	if (list_empty(&log_queue))
-		return NULL;
-
-	return list_first_entry_or_null(&log_queue, struct log_entry, list);
+	return ringbuf_read(&rbuf);
 }
 
 static int proc_seq_show(struct seq_file *s, void *v)
@@ -83,19 +86,12 @@ static int proc_seq_show(struct seq_file *s, void *v)
 	}
 	seq_printf(s, " }\n");
 
-	spin_lock(&log_queue_lock);
-	list_del(&e->list);
-	spin_unlock(&log_queue_lock);
-	kfree(e);
 	return 0;
 }
 
 static void *proc_seq_next(struct seq_file *s, void *v, loff_t *pos)
 {
-	if (list_empty(&log_queue))
-		return NULL;
-
-	return list_first_entry_or_null(&log_queue, struct log_entry, list);
+	return ringbuf_read(&rbuf);
 }
 
 static void proc_seq_stop(struct seq_file *s, void *v)
@@ -138,62 +134,69 @@ static int __must_check is_reader_or_child(void)
 	return false;
 }
 
-static int __must_check log_common(struct log_entry *entry)
+static int __must_check log_common(struct log_entry *entry,
+				   const struct commit_s *commit)
 {
+	/*
 	if (proc_reader && is_reader_or_child()) {
 		kfree(entry);
 		return 0;
 	}
+	*/
 
 	/* fill common log record info */
 	entry->common.pid = current->pid;
 	entry->common.tgid = current->tgid;
 	memcpy(&entry->common.comm, current->comm, sizeof(entry->common.comm));
 
-	spin_lock(&log_queue_lock);
 	entry->id = atomic_read(&counter);
 	atomic_inc(&counter);
-	list_add_tail(&entry->list, &log_queue);
-	spin_unlock(&log_queue_lock);
+
+	ringbuf_commit(&rbuf, commit);
 	return 0;
 }
 
 int __must_check log_socket(const struct sockaddr_storage *const saddr)
 {
-	struct log_entry *entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+	struct commit_s commit = { .size = sizeof(struct log_entry) };
+	struct log_entry *entry = ringbuf_reserve(&rbuf, &commit);
 	if (!entry)
 		return -EFAULT;
 
 	entry->log_type = LOG_SOCKET;
 	memcpy(&entry->socket.saddr, saddr, sizeof(entry->socket.saddr));
-	return log_common(entry);
+	return log_common(entry, &commit);
 }
 
 int __must_check log_process(void)
 {
-	struct log_entry *entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+	struct commit_s commit = { .size = sizeof(struct log_entry) };
+	struct log_entry *entry = ringbuf_reserve(&rbuf, &commit);
 	if (!entry)
 		return -EFAULT;
 
 	entry->log_type = LOG_PROCESS;
 	/* current no additional record info */
-	return log_common(entry);
+	return log_common(entry, &commit);
 }
 
 int __must_check log_file(const char *const filename)
 {
-	struct log_entry *entry = kmalloc(sizeof(*entry), GFP_KERNEL);
+	struct commit_s commit = { .size = sizeof(struct log_entry) };
+	struct log_entry *entry = ringbuf_reserve(&rbuf, &commit);
 	if (!entry)
 		return -EFAULT;
 
 	entry->log_type = LOG_FILE;
 	strncpy(entry->file.filename, filename, PATH_MAX);
-	return log_common(entry);
+	return log_common(entry, &commit);
 }
 
 
 int __must_check proc_init(void)
 {
+	ringbuf_init(&rbuf);
+
 	struct proc_dir_entry *de = proc_create(PROCNAME, 0, NULL, &proc_fops);
 	if (IS_ERR(de))
 		return PTR_ERR(de);
@@ -204,4 +207,6 @@ int __must_check proc_init(void)
 void proc_cleanup(void)
 {
 	remove_proc_entry(PROCNAME, NULL);
+
+	ringbuf_free(&rbuf);
 }
