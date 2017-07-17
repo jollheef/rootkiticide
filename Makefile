@@ -3,7 +3,7 @@ VMHOST := qemu
 
 obj-m += rkcd.o
 rkcd-objs = rootkiticide.o
-rkcd-objs +=  scheduler_hook.o fd_hook.o hw_breakpoint.o proc.o
+rkcd-objs +=  scheduler_hook.o fd_hook.o hw_breakpoint.o proc.o ringbuf.o
 ccflags-y := -std=gnu99 -Wno-declaration-after-statement -Wall
 ccflags-y += -Wframe-larger-than=8192 # it's safe or not?
 
