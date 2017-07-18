@@ -94,6 +94,7 @@ void ringbuf_commit(struct ringbuf * const rb, const struct commit_s *commit)
 {
 	check_overwrite(rb, commit->block);
 	atomic_add(commit->size + RB_HEADER_SIZE, &commit->block->occupied);
+	smp_wmb();
 	atomic_sub(commit->size + RB_HEADER_SIZE, &commit->block->reserved);
 }
 
@@ -128,6 +129,7 @@ entry:
 		while (atomic_read(&readblock->reserved)) {
 			// fixme: need wait queue
 		}
+		smp_rmb();
 		occupied = atomic_read(&readblock->occupied);
 	}
 
