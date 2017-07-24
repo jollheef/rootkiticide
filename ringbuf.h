@@ -1,3 +1,10 @@
+/**
+ * @file ringbuf.h
+ * @author Aleksandr Trukhin <alxtry@gmail.com>
+ * @date July 2017
+ * @brief simple ringbuffer
+ */
+
 #pragma once
 
 #include <linux/atomic.h>

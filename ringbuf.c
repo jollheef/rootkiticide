@@ -1,3 +1,10 @@
+/**
+ * @file ringbuf.c
+ * @author Aleksandr Trukhin <alxtry@gmail.com>
+ * @date July 2017
+ * @brief simple ringbuffer
+ */
+
 #include "ringbuf.h"
 #include "ringbuf_internal.h"
 
