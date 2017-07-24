@@ -10,7 +10,6 @@ void ringbuf_init(struct ringbuf * const rb)
 	for (i = 0; i < RB_NUM_BLOCKS + 1; i++) {
 		rb->blocks[i].pages = alloc_pages(GFP_KERNEL,
 						get_count_order(RB_BLOCK_PAGES));
-		atomic_set(&rb->blocks[i].reserved, 0);
 		atomic_set(&rb->blocks[i].occupied, 0);
 		rb->blocks[i].ptr = page_address(&rb->blocks[i].pages[0]);
 	}
@@ -25,8 +24,7 @@ void ringbuf_free(struct ringbuf * const rb)
 {
 	ulong i;
 
-	for (i = 0; i < RB_NUM_BLOCKS + 1; i++)
-		while (atomic_read(&rb->blocks[i].reserved)) {} //fixme
+	/* fixme: proper cleanup */
 
 	for (i = 0; i < RB_NUM_BLOCKS + 1; i++)
 		__free_pages(rb->blocks[i].pages, get_count_order(RB_BLOCK_PAGES));
@@ -37,72 +35,43 @@ void ringbuf_free(struct ringbuf * const rb)
 
 void *ringbuf_reserve(struct ringbuf * const rb, struct commit_s *commit)
 {
-	void *addr;
 	ulong offset;
 	ulong blocknum;
-	long extra_bytes;
-	struct block *block;
+	long overflow_bytes;
 	size_t size = commit->size;
 	struct entry_header *header;
 
 retry:
 	offset = atomic_add_return(size + RB_HEADER_SIZE, &rb->tail)
 			- size - RB_HEADER_SIZE;
-	blocknum = offset_to_blocknum(rb, offset);
-	block = block_acquire(rb, blocknum);
-	addr = block->ptr + offset_in_block(rb, offset);
-	extra_bytes = (offset_in_block(rb, offset) + size + RB_HEADER_SIZE) - RB_BLOCK_SIZE;
-	if (unlikely(extra_bytes > 0)) {
-		/*
-		 * Boundary wrap
-		 */
-		ulong rem_bytes = size + RB_HEADER_SIZE - extra_bytes;
-		atomic_add(rem_bytes, &block->reserved);
-		write_skip_header(addr, rem_bytes, rem_bytes);
-		check_overwrite(rb, block);
-		atomic_add(rem_bytes, &block->occupied);
-		atomic_sub(rem_bytes, &block->reserved);
-		block_release(rb, blocknum);
+	blocknum = offset_to_blocknum(offset);
 
-		offset += rem_bytes;
-		blocknum = offset_to_blocknum(rb, offset);
-		block = block_acquire(rb, blocknum);
-		addr = block->ptr + offset_in_block(rb, offset);
-		atomic_add(extra_bytes, &block->reserved);
-		write_skip_header(addr, extra_bytes, extra_bytes);
-		check_overwrite(rb, block);
-		atomic_add(extra_bytes, &block->occupied);
-		atomic_sub(extra_bytes, &block->reserved);
-
+	overflow_bytes = (offset_in_block(offset) + size + RB_HEADER_SIZE) - RB_BLOCK_SIZE;
+	if (unlikely(overflow_bytes > 0)) {
+		boundary_wrap(rb, blocknum, offset, size, overflow_bytes);
 		goto retry;
 	}
 
-	atomic_add(size + RB_HEADER_SIZE, &block->reserved);
-	if (extra_bytes == 0)
-		block_release(rb, blocknum);
-
-	header = addr;
+	header = block_acquire(rb, blocknum)->ptr + offset_in_block(offset);
 	header->skip_header = false;
 	header->short_header = false;
 	header->long_size = size;
 
-	commit->block = block;
-	return addr + RB_HEADER_SIZE;
+	commit->blocknum = blocknum;
+	return (void *)header + RB_HEADER_SIZE;
 }
 
 void ringbuf_commit(struct ringbuf * const rb, const struct commit_s *commit)
 {
-	check_overwrite(rb, commit->block);
-	atomic_add(commit->size + RB_HEADER_SIZE, &commit->block->occupied);
-	smp_wmb();
-	atomic_sub(commit->size + RB_HEADER_SIZE, &commit->block->reserved);
+	struct block *block = block_acquire(rb, commit->blocknum);
+	finalize_commit(rb, block, commit->blocknum, commit->size + RB_HEADER_SIZE);
 }
 
 static int __must_check switch_readblock(struct ringbuf * const rb)
 {
 	ulong blocknum, switchwith_id, readblock_id;
 
-	blocknum = offset_to_blocknum(rb, atomic_read(&rb->head));
+	blocknum = offset_to_blocknum(atomic_read(&rb->head));
 	readblock_id = atomic_read(&rb->read_map) & RB_BLOCKID_MASK;
 	switchwith_id = atomic_read(&rb->block_map[blocknum]) & RB_BLOCKID_MASK;
 	/* check if used by the writer and switch atomically */
@@ -126,10 +95,6 @@ entry:
 		if (switch_readblock(rb))
 			return NULL;
 		readblock = readblock_get(rb);
-		while (atomic_read(&readblock->reserved)) {
-			// fixme: need wait queue
-		}
-		smp_rmb();
 		occupied = atomic_read(&readblock->occupied);
 	}
 

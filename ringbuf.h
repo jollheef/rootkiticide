@@ -6,7 +6,6 @@
 
 struct block {
 	void *ptr;		/* virtual memory address */
-	atomic_t reserved;	/* bytes reserved */
 	atomic_t occupied;	/* bytes committed */
 	struct page *pages;	/* underlying pages */
 };
@@ -35,7 +34,7 @@ struct ringbuf {
 };
 
 struct commit_s {
-	struct block *block;
+	ulong blocknum;
 	size_t size;
 };
 

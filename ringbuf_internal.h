@@ -29,13 +29,13 @@ struct block *readblock_get(struct ringbuf * const rb)
 }
 
 static inline
-ulong offset_to_blocknum(struct ringbuf * const rb, ulong offset)
+ulong offset_to_blocknum(const ulong offset)
 {
 	return (offset >> get_count_order(RB_BLOCK_SIZE)) % RB_NUM_BLOCKS;
 }
 
 static inline
-struct block *block_acquire(struct ringbuf * const rb, ulong blocknum)
+struct block *block_acquire(struct ringbuf * const rb, const ulong blocknum)
 {
 	ulong blockmap;
 
@@ -49,14 +49,22 @@ struct block *block_acquire(struct ringbuf * const rb, ulong blocknum)
 }
 
 static inline
-void block_release(struct ringbuf * const rb, ulong blocknum)
+bool block_acquired(struct ringbuf * const rb, const ulong blocknum)
 {
+	ulong blockmap = atomic_read(&rb->block_map[blocknum]);
+	return (blockmap & RB_BLOCKRESERVE_BIT) ? true : false;
+}
+
+static inline
+void block_release(struct ringbuf * const rb, const ulong blocknum)
+{
+	/* need barrier before the call */
 	ulong blockmap = atomic_read(&rb->block_map[blocknum]);
 	atomic_set(&rb->block_map[blocknum], blockmap & RB_BLOCKID_MASK);
 }
 
 static inline
-ulong offset_in_block(struct ringbuf * const rb, ulong offset)
+ulong offset_in_block(const ulong offset)
 {
 	return offset & (RB_BLOCK_SIZE - 1);
 }
@@ -88,4 +96,30 @@ void check_overwrite(struct ringbuf * const rb, struct block * const block)
 		old_head = atomic_read(&rb->head);
 		atomic_cmpxchg(&rb->head, old_head, old_head + RB_BLOCK_SIZE);
 	}
+}
+
+static inline
+void finalize_commit(struct ringbuf * const rb, struct block * const block,
+		const ulong blocknum, const ulong bytes)
+{
+	check_overwrite(rb, block);
+	if (atomic_add_return(bytes, &block->occupied) == RB_BLOCK_SIZE)
+		block_release(rb, blocknum);
+}
+
+static inline
+void boundary_wrap(struct ringbuf * const rb, const ulong blocknum,
+		const ulong offset, const size_t size, const ulong overflow_bytes)
+{
+	struct block *block = block_acquire(rb, blocknum);
+	void *addr = block->ptr + offset_in_block(offset);
+	ulong prev_bytes = size + RB_HEADER_SIZE - overflow_bytes;
+
+	write_skip_header(addr, prev_bytes, prev_bytes);
+	finalize_commit(rb, block, blocknum, prev_bytes);
+
+	block = block_acquire(rb, (blocknum + 1) % RB_NUM_BLOCKS);
+	addr = block->ptr;
+	write_skip_header(addr, overflow_bytes, overflow_bytes);
+	finalize_commit(rb, block, (blocknum + 1) % RB_NUM_BLOCKS, overflow_bytes);
 }
