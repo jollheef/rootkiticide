@@ -11,6 +11,7 @@ ccflags-y += -Wframe-larger-than=8192 # it's safe or not?
 
 module:
 	make -C $(KERNEL) M=$(PWD) modules
+	cp test.sh $(TARGET).ko_test
 
 cli:
 	go build rkcdcli.go
