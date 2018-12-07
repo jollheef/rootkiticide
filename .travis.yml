@@ -17,7 +17,7 @@ services:
 before_script:
   - go get -u github.com/jollheef/out-of-tree
   - out-of-tree bootstrap
-  - out-of-tree autogen
+  - out-of-tree kernel autogen
 
 script:
   - out-of-tree pew
