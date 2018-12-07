@@ -4,4 +4,4 @@ type = "module"
 [[supported_kernels]]
 distro_type = "Ubuntu"
 distro_release = "16.04"
-release_mask = ".*"
+release_mask = "4.4.0-70.*"
