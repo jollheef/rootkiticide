@@ -1,0 +1,7 @@
+name = "rootkiticide"
+type = "module"
+
+[[supported_kernels]]
+distro_type = "Ubuntu"
+distro_release = "16.04"
+release_mask = ".*"
