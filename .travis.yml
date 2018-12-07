@@ -1,0 +1,23 @@
+language: go
+
+go:
+  - master
+
+os:
+  - linux
+
+addons:
+  apt:
+    packages:
+    - qemu
+
+services:
+  - docker
+
+before_script:
+  - go get -u github.com/jollheef/out-of-tree
+  - out-of-tree bootstrap
+  - out-of-tree autogen
+
+script:
+  - out-of-tree pew
