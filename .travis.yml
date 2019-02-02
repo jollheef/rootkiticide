@@ -15,7 +15,7 @@ services:
   - docker
 
 before_script:
-  - go get -u github.com/jollheef/out-of-tree
+  - go get -u code.dumpstack.io/tools/out-of-tree
   - out-of-tree bootstrap
   - out-of-tree kernel autogen
 
