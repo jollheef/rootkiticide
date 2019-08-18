@@ -1,26 +1,30 @@
-language: go
-
-go:
-  - master
+language: generic
 
 os:
   - linux
 
 dist:
-  - xenial
+  - bionic
 
 addons:
   apt:
     packages:
     - qemu
+  snaps:
+    - name: go
+      confinement: classic
 
 services:
   - docker
 
+env:
+  - GO111MODULE=on
+
 before_script:
   - go get -u code.dumpstack.io/tools/out-of-tree
   - out-of-tree bootstrap
-  - out-of-tree kernel autogen
+  - out-of-tree kernel autogen --max=8
+  - sudo ln -s $HOME/.out-of-tree /root/
 
 script:
-  - out-of-tree pew
+  - sudo $(which out-of-tree) pew --max=8
