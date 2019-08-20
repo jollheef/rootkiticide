@@ -22,7 +22,6 @@ env:
 
 before_script:
   - go get -u code.dumpstack.io/tools/out-of-tree
-  - out-of-tree bootstrap
   - out-of-tree kernel autogen --max=8
   - sudo ln -s $HOME/.out-of-tree /root/
 
