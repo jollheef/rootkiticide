@@ -1,0 +1,36 @@
+name: out-of-tree.io
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+
+    - name: apt update
+      run: sudo apt update
+      env:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: install qemu
+      run: sudo apt install -y qemu
+      env:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: install out-of-tree
+      run: |
+        export GOPATH=$HOME
+        go get -u code.dumpstack.io/tools/out-of-tree
+      env:
+        GO111MODULE: on
+
+    - name: download kernels
+      run: |
+        export PATH=$PATH:$HOME/bin
+        out-of-tree kernel autogen --max=8
+
+    - name: run tests
+      run: |
+        export PATH=$PATH:$HOME/bin
+        out-of-tree --timeout=1h pew --docker-timeout=10m --qemu-timeout=10m
